@@ -1,0 +1,43 @@
+name: Code Quality
+
+on:
+  pull_request:
+    paths: &paths
+      - "**.py"
+      - "**.toml"
+      - "**.lock"
+      - Makefile
+      - .github/actions/setup-uv/action.yml
+      - .github/workflows/code-quality.yml
+  push:
+    branches-ignore:
+      - master
+      - staging
+    paths: *paths
+
+jobs:
+  ruff:
+    name: Ruff (lint)
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup uv
+        uses: ./.github/actions/setup-uv
+      - name: Install dependencies
+        run: make install
+      - name: Lint
+        run: make lint-check
+
+  ty:
+    name: ty (type-check)
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup uv
+        uses: ./.github/actions/setup-uv
+      - name: Install dependencies
+        run: make install
+      - name: Type-check
+        run: make typecheck

@@ -1,17 +1,41 @@
-from django.conf.urls import include, url
-
+# ruff: noqa: F405
 #####################################
 #
 #   V2 API setup using Django Rest
 #
 #####################################
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+from django.urls import URLPattern, URLResolver, include, path, re_path
 from rest_framework import routers
-from pokemon_v2.api import *
+from rest_framework.reverse import reverse as drf_reverse
+from typing_extensions import override
 
-# pylint: disable=invalid-name
+from pokemon_v2.api import *  # noqa: F403
 
-router = routers.DefaultRouter()
+if TYPE_CHECKING:
+    from rest_framework.request import Request
+    from rest_framework.response import Response
+
+
+class PokeAPIRootView(routers.APIRootView):
+    @override
+    def get(self, request: Request, *args: Any, **kwargs: Any) -> Response:
+        response = super().get(request, *args, **kwargs)
+        response.data["meta"] = drf_reverse("meta", request=request)
+        response.data = dict(sorted(response.data.items()))
+        return response
+
+
+class PokeAPIRouter(routers.DefaultRouter):
+    APIRootView = PokeAPIRootView
+
+
+router = PokeAPIRouter()
+
 
 router.register(r"ability", AbilityResource)
 router.register(r"berry", BerryResource)
@@ -26,6 +50,7 @@ router.register(r"encounter-condition", EncounterConditionResource)
 router.register(r"encounter-condition-value", EncounterConditionValueResource)
 router.register(r"evolution-chain", EvolutionChainResource)
 router.register(r"evolution-trigger", EvolutionTriggerResource)
+router.register(r"evolution-variable", EvolutionVariableResource)
 router.register(r"generation", GenerationResource)
 router.register(r"gender", GenderResource)
 router.register(r"growth-rate", GrowthRateResource)
@@ -34,6 +59,7 @@ router.register(r"item-category", ItemCategoryResource)
 router.register(r"item-attribute", ItemAttributeResource)
 router.register(r"item-fling-effect", ItemFlingEffectResource)
 router.register(r"item-pocket", ItemPocketResource)
+router.register(r"currency", CurrencyResource)
 router.register(r"language", LanguageResource)
 router.register(r"location", LocationResource)
 router.register(r"location-area", LocationAreaResource)
@@ -69,9 +95,10 @@ router.register(r"version-group", VersionGroupResource)
 #
 ###########################
 
-urlpatterns = [
-    url(r"^api/v2/", include(router.urls)),
-    url(
+urlpatterns: list[URLPattern | URLResolver] = [
+    path("api/v2/meta/", PokeapiMetaView.as_view(), name="meta"),
+    path("api/v2/", include(router.urls)),
+    re_path(
         r"^api/v2/pokemon/(?P<pokemon_id>\d+)/encounters",
         PokemonEncounterView.as_view(),
         name="pokemon_encounters",

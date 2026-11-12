@@ -1,13 +1,10 @@
 with import <nixpkgs> { };
-pkgs.mkShell {
-  name = "onix-shellder";
-  venvDir = "./.venv";
-  buildInputs = [
-    python310Packages.python
-    python310Packages.venvShellHook
 
-    # Required dependancies 
-    black
+mkShell {
+  packages = [
+    uv
+
+    # non-Python system libraries your project needs
     taglib
     openssl
     git
@@ -17,16 +14,8 @@ pkgs.mkShell {
     zlib
   ];
 
-  # Run this command, only after creating the virtual environment
-  postVenvCreation = ''
+  shellHook = ''
     unset SOURCE_DATE_EPOCH
-    pip install -r requirements.txt
+    uv sync --locked --all-extras --dev
   '';
-
-  postShellHook = ''
-    # allow pip to install wheels
-    unset SOURCE_DATE_EPOCH
-    zsh -l
-  '';
-
 }

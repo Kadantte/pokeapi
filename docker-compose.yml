@@ -1,19 +1,23 @@
-version: '2.4'
 services:
   cache:
-    image: redis:7.2.3-alpine
+    image: redis:8.6.4-alpine
     volumes:
       - redis_data:/data
     restart: always
 
   db:
-    image: postgres:16.1
+    image: postgres:18.4-alpine3.24
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pokemon}
       POSTGRES_USER: ${POSTGRES_USER:-ash}
       POSTGRES_DB: ${POSTGRES_DB:-pokeapi}
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      - pg_data:/var/lib/postgresql/
+    healthcheck:
+      test: pg_isready -U $${POSTGRES_USER:-ash} -d $${POSTGRES_DB:-pokeapi}
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: always
 
   app:
@@ -24,16 +28,16 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-pokeapi}
     volumes:
       - .:/code
-    links:
-      - db
-      - cache
+      - /code/.venv/ # Ignore the venv to prevent conflicts between the host and container environments
     depends_on:
-      - db
-      - cache
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_started
     restart: always
 
   web:
-    image: nginx:1.25.3-alpine
+    image: nginx:1.31.2-alpine3.23
     ports:
       - "80:80"
       - "443:443"
@@ -44,11 +48,13 @@ services:
       - ./Resources/nginx/ssl:/ssl:ro
       - graphql_cache:/tmp/cache
   graphql-engine:
-    image: hasura/graphql-engine:v2.36.1-ce
+    image: hasura/graphql-engine:v2.50.2
+    user: 1001:1001
     ports:
       - "8080:8080"
     depends_on:
-      - "db"
+      db:
+        condition: service_healthy
     restart: always
     environment:
       HASURA_GRAPHQL_DATABASE_URL: postgres://${POSTGRES_USER:-ash}:${POSTGRES_PASSWORD:-pokemon}@db:5432/${POSTGRES_DB:-pokeapi}
@@ -60,6 +66,13 @@ services:
       HASURA_GRAPHQL_UNAUTHORIZED_ROLE: anon
       HASURA_GRAPHQL_ENABLE_TELEMETRY: "false"
       # HASURA_GRAPHQL_CONSOLE_ASSETS_DIR: /srv/console-assets
+    healthcheck:
+      test: ["CMD", "curl", "-k", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 2
+      start_period: 30s
+      start_interval: 5s
 
 volumes:
   pg_data:
